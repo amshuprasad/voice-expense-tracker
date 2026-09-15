@@ -15,35 +15,9 @@ OLLAMA_MODEL = "qwen3:4b"
 
 OLLAMA_TIMEOUT = 120
 
-
-# ============================================================
-# CURRENCY
-# ============================================================
-
 CURRENCY_ALIASES = r"(?:₹|rs\.?|inr|rupees?|bucks?)"
 
-
-# ============================================================
-# AMOUNT EXTRACTION
-# ============================================================
-
 def extract_amount(text: str):
-    """
-    Extract the first monetary/numeric amount.
-
-    Examples:
-        ₹450
-        ₹1,250
-        rs 450
-        rs. 450
-        450 rupees
-        450 INR
-        5,000
-        1,25,000
-        450.50
-        450
-    """
-
     number = r"\d[\d,]*(?:\.\d+)?"
 
     pattern = (
@@ -76,26 +50,7 @@ def extract_amount(text: str):
     except ValueError:
         return None
 
-
-# ============================================================
-# DATE EXTRACTION
-# ============================================================
-
 def extract_date(text: str):
-    """
-    Extract expense date.
-
-    Examples:
-        today
-        yesterday
-        last Monday
-        5th September
-        September 5
-        2026-09-05
-
-    Defaults to today.
-    """
-
     lower = text.lower()
 
     if "yesterday" in lower:
@@ -118,32 +73,13 @@ def extract_date(text: str):
 
     return datetime.now().date().isoformat()
 
-
-# ============================================================
-# OLLAMA
-# ============================================================
-
 def call_ollama(prompt: str) -> dict:
-    """
-    Call local Ollama and return parsed JSON.
-
-    Qwen3:
-    - Thinking is disabled
-    - JSON response is requested
-    - No cloud API is used
-    """
-
     payload = {
         "model": OLLAMA_MODEL,
         "prompt": prompt,
         "stream": False,
         "format": "json",
-
-        # Important for Qwen3.
-        # Prevents the model from spending the response
-        # on reasoning/thinking instead of returning JSON.
         "think": False,
-
         "options": {
             "temperature": 0.1,
             "num_ctx": 4096,
@@ -154,92 +90,58 @@ def call_ollama(prompt: str) -> dict:
         "Calling Ollama model=%s",
         OLLAMA_MODEL
     )
-
     try:
-
         response = requests.post(
             OLLAMA_URL,
             json=payload,
             timeout=OLLAMA_TIMEOUT,
         )
-
         logger.info(
             "Ollama HTTP status=%s",
             response.status_code
         )
-
         response.raise_for_status()
-
     except requests.exceptions.ConnectionError as exc:
-
         logger.exception(
             "Cannot connect to Ollama"
         )
-
         raise RuntimeError(
             "Cannot connect to Ollama. "
             "Make sure Ollama is running at "
             "http://localhost:11434"
         ) from exc
-
     except requests.exceptions.Timeout as exc:
-
         logger.exception(
             "Ollama request timed out"
         )
-
         raise RuntimeError(
             "Ollama request timed out."
         ) from exc
-
     except requests.exceptions.RequestException as exc:
-
         logger.exception(
             "Ollama request failed"
         )
-
         raise RuntimeError(
             f"Ollama request failed: {exc}"
         ) from exc
-
     try:
-
         data = response.json()
-
     except ValueError as exc:
-
         raise RuntimeError(
             "Ollama returned invalid JSON: "
             f"{response.text[:1000]}"
         ) from exc
-
-    # --------------------------------------------------------
-    # OLLAMA ERROR
-    # --------------------------------------------------------
-
     if data.get("error"):
-
         raise RuntimeError(
             f"Ollama error: {data['error']}"
         )
-
-    # --------------------------------------------------------
-    # RESPONSE
-    # --------------------------------------------------------
-
     raw_response = data.get("response")
-
-    # Qwen3 may return thinking separately.
-    # Log it so we can diagnose problems.
     if data.get("thinking"):
-
         logger.info(
             "Ollama thinking: %s",
             str(data["thinking"])[:1000]
         )
-
     if raw_response is None:
-
         raise RuntimeError(
             "Ollama response field is missing. "
             f"Full response: {data}"
@@ -248,69 +150,39 @@ def call_ollama(prompt: str) -> dict:
     raw_response = raw_response.strip()
 
     if not raw_response:
-
         raise RuntimeError(
             "Ollama returned an empty response. "
             f"Full response: {data}"
         )
-
     logger.info(
         "Ollama generated: %s",
         raw_response
     )
 
-    # --------------------------------------------------------
-    # PARSE JSON
-    # --------------------------------------------------------
-
     try:
-
         return json.loads(raw_response)
-
     except json.JSONDecodeError:
-
         cleaned = raw_response.strip()
-
-        # Remove markdown code fences if present.
         cleaned = re.sub(
             r"^```json\s*",
             "",
             cleaned,
             flags=re.IGNORECASE
         )
-
         cleaned = re.sub(
             r"\s*```$",
             "",
             cleaned
         )
-
         try:
-
             return json.loads(cleaned)
-
         except json.JSONDecodeError as exc:
-
             raise RuntimeError(
                 "Ollama returned text that is not valid JSON: "
                 f"{raw_response}"
             ) from exc
 
-
-# ============================================================
-# DYNAMIC AI EXPENSE EXTRACTION
-# ============================================================
-
 def extract_expense_with_ai(text: str) -> dict:
-    """
-    Dynamically understand the expense.
-
-    There is NO hard-coded category list.
-
-    Ollama determines the category based on
-    the semantic meaning of the expense.
-    """
-
     prompt = f"""
 You are an intelligent personal finance expense parser.
 
@@ -424,11 +296,6 @@ Return EXACTLY this JSON structure:
 """
 
     result = call_ollama(prompt)
-
-    # --------------------------------------------------------
-    # VALIDATE RESULT
-    # --------------------------------------------------------
-
     category = result.get("category")
     description = result.get("description")
     people = result.get("people")
@@ -450,19 +317,8 @@ Return EXACTLY this JSON structure:
         "people": people,
     }
 
-
-# ============================================================
-# MAIN PARSER
-# ============================================================
-
 def parse_expense_text(text: str) -> dict:
-    """
-    Convert natural language expense text into
-    structured expense data.
-    """
-
     if not text or not text.strip():
-
         raise ValueError(
             "Expense text cannot be empty"
         )
@@ -474,35 +330,18 @@ def parse_expense_text(text: str) -> dict:
         text
     )
 
-    # --------------------------------------------------------
-    # DETERMINISTIC EXTRACTION
-    # --------------------------------------------------------
-
     amount = extract_amount(text)
-
     date = extract_date(text)
-
     logger.info(
         "Extracted amount=%s date=%s",
         amount,
         date
     )
-
-    # --------------------------------------------------------
-    # AI SEMANTIC EXTRACTION
-    # --------------------------------------------------------
-
     ai_result = extract_expense_with_ai(text)
-
     logger.info(
         "AI expense result: %s",
         ai_result
     )
-
-    # --------------------------------------------------------
-    # FINAL RESULT
-    # --------------------------------------------------------
-
     return {
         "raw_text": text,
         "amount": amount,

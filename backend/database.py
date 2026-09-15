@@ -1,8 +1,3 @@
-"""
-SQLite persistence layer. SQLite ships with Python (no external DB
-server, no hosting cost) and the whole database is a single file:
-expenses.db, created automatically next to this script.
-"""
 import sqlite3
 from contextlib import contextmanager
 
