@@ -259,8 +259,7 @@ export default function Home() {
           </h1>
 
           <p className="hero-description">
-            Speak naturally. Whisper transcribes your voice,
-            then local AI understands the expense automatically.
+            Simply speak your expense. Voice Spend intelligently captures, understands, and categorizes every transaction automatically.
           </p>
         </div>
 
@@ -561,9 +560,6 @@ export default function Home() {
                 Where your money goes
               </h2>
             </div>
-            <span className="dynamic-label">
-              ✦ Generated from your data
-            </span>
           </div>
 
           <div className="category-list">
