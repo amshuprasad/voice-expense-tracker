@@ -97,10 +97,6 @@ export default function Home() {
       .sort((a, b) => b.amount - a.amount);
   }, [expenses]);
 
-  // ============================================================
-  // LIVE AUDIO-REACTIVE STYLING
-  // ============================================================
-
   // Louder voice -> faster orbit spin (real, not canned). Quiet/idle
   // falls back to a slow ambient rotation so the ring never looks dead.
   const orbitSpinSeconds = isRecording

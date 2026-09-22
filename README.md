@@ -1,65 +1,129 @@
-# 🎙️ Voice Expense Tracker
+# Voice Expense Tracker
 
-Say "Spent 450 on dinner with friends" → get a structured expense
-(amount, category, description, date, people) automatically. Built to
-run at **₹0 / $0 cost**:
+An AI-powered expense tracking application that converts natural spoken language into structured financial records. Users record a short voice note describing a transaction (e.g. *"Spent 450 on dinner with friends"*), and the system automatically extracts the amount, category, description, date, and involved parties.
 
-| Piece | What's used | Cost |
+Designed and built to operate at **zero infrastructure cost**, using entirely open-source, self-hosted components.
+
+---
+
+## Table of Contents
+
+- [Overview](#overview)
+- [Architecture](#architecture)
+- [Tech Stack](#tech-stack)
+- [Project Structure](#project-structure)
+- [Getting Started](#getting-started)
+  - [Prerequisites](#prerequisites)
+  - [Backend Setup](#backend-setup)
+  - [Frontend Setup](#frontend-setup)
+- [Environment Variables](#environment-variables)
+- [Usage](#usage)
+- [Speech-to-Text Pipeline](#speech-to-text-pipeline)
+- [Expense Parsing Logic](#expense-parsing-logic)
+- [Deployment](#deployment)
+- [Roadmap](#roadmap)
+- [Known Limitations](#known-limitations)
+- [License](#license)
+
+---
+
+## Overview
+
+Voice Expense Tracker eliminates manual data entry for expense logging. A user speaks a sentence describing a purchase; the backend transcribes the audio locally, extracts structured fields using a rule-based parser, and presents an editable confirmation card before persisting the record.
+
+No third-party paid APIs are used at any stage of the pipeline — speech recognition and parsing both run on infrastructure the developer controls.
+
+| Capability | Implementation | Cost |
 |---|---|---|
-| Voice → text | Self-hosted **faster-whisper** (open-source Whisper model, MIT license) running on your own machine | Free forever, no key, no per-minute charge |
-| Text → structured data | Rule-based Python parser (regex + keywords) | Free, no external API |
-| Storage | SQLite (a single file, no DB server) | Free |
-| Hosting (optional) | Vercel (frontend) + Render/Fly.io free tier (backend) | Free tier |
+| Speech-to-text | Self-hosted `faster-whisper` (open-source Whisper reimplementation) | Free, no API key, no usage-based billing |
+| Text-to-structured-data | Rule-based Python parser (regex + keyword matching) | Free, no external API |
+| Hosting | Vercel (frontend) + Hugging Face Spaces (backend) | Free tier |
 
-No OpenAI API, no Google Speech API, no paid LLM calls anywhere.
-Whisper's *model weights* are open-source and run entirely offline
-once downloaded — the only network call is a one-time download of
-the model file from Hugging Face the first time you run the backend.
-After that, transcription happens 100% locally with zero ongoing cost,
-regardless of how many expenses you log. See "Going further" below
-for how to optionally add an LLM later for smarter parsing.
+---
 
-## Project structure
+## Architecture
+
+```
+┌──────────────┐      audio (blob)      ┌──────────────────┐
+│   Frontend   │ ─────────────────────► │     Backend        │
+│  (Next.js)   │                        │    (FastAPI)        │
+│              │ ◄───────────────────── │                      │
+└──────────────┘   parsed expense JSON  └──────────┬───────────┘
+                                                    │
+                                                    ▼
+                                        ┌────────────────────────┐
+                                        │  faster-whisper (STT)   │
+                                        │  + rule-based parser     │
+                                        └────────────────────────┘
+```
+
+1. The browser records audio via the `MediaRecorder` API.
+2. The audio blob is sent to the FastAPI backend.
+3. `faster-whisper` transcribes the audio locally (CPU, no external call).
+4. A rule-based parser extracts amount, category, date, description, and people from the transcript.
+5. The frontend displays an editable confirmation card; the user confirms or corrects fields before saving.
+
+---
+
+## Tech Stack
+
+**Frontend**
+- Next.js (App Router)
+- React
+- TypeScript
+
+**Backend**
+- Python
+- FastAPI
+- faster-whisper (CTranslate2-based Whisper inference)
+
+---
+
+## Project Structure
 
 ```
 voice-expense-tracker/
-├── backend/              FastAPI app
-│   ├── main.py           API routes
-│   ├── parser.py         Rule-based text → expense extraction
-│   ├── database.py       SQLite persistence
+├── backend/
+│   ├── main.py               # API routes
+│   ├── parser.py              # Rule-based text → expense extraction
+│   ├── whisper_service.py     # faster-whisper transcription service
 │   └── requirements.txt
-└── frontend/             Next.js (App Router) app
+└── frontend/
     ├── app/
-    │   ├── page.tsx       Mic UI + expense list
+    │   ├── page.tsx            # Mic UI + expense list
     │   ├── layout.tsx
     │   └── globals.css
     └── lib/
-        ├── api.ts                 Backend API calls
-        └── useAudioRecorder.ts    Records mic audio (MediaRecorder API)
+        ├── api.ts                    # Backend API client
+        └── useAudioRecorder.ts       # Mic recording hook (MediaRecorder API)
 ```
 
-## 1. Run the backend
+---
+
+## Getting Started
+
+### Prerequisites
+
+- Python 3.9+
+- Node.js 18+
+- A modern Chromium-based browser (Chrome or Edge) with microphone access, served over `localhost` or HTTPS
+
+### Backend Setup
 
 ```bash
 cd backend
 python -m venv venv
-venv\Scripts\activate
+venv\Scripts\activate        # Windows
+# source venv/bin/activate   # macOS/Linux
 pip install -r requirements.txt
 uvicorn main:app --reload --port 8000
 ```
 
-Backend now runs at `http://localhost:8000`. Check `http://localhost:8000/docs`
-for interactive Swagger docs (auto-generated by FastAPI).
+The API will be available at `http://localhost:8000`. Interactive API documentation (Swagger UI) is auto-generated by FastAPI at `http://localhost:8000/docs`.
 
-**First run note:** the first time you record something, `faster-whisper`
-downloads the `base` model (~140MB) from Hugging Face automatically and
-caches it locally (usually in `~/.cache/huggingface`). This needs
-internet access **once**. Every transcription after that runs fully
-offline with no network call and no cost. If you're behind a
-restrictive firewall/proxy, make sure `huggingface.co` is reachable
-for that first run.
+> **Note:** On first use, `faster-whisper` downloads the `base` model (~140MB) from Hugging Face and caches it locally under `~/.cache/huggingface`. This requires internet access once. All subsequent transcriptions run fully offline with no network dependency or cost.
 
-## 2. Run the frontend
+### Frontend Setup
 
 ```bash
 cd frontend
@@ -68,74 +132,100 @@ cp .env.local.example .env.local
 npm run dev
 ```
 
-Open `http://localhost:3000` over `http://localhost` or HTTPS (browsers
-require a secure context for microphone access). Works in Chrome,
-Edge, and Firefox since it uses the standard `MediaRecorder` API, not
-a vendor-specific speech service.
+Open `http://localhost:3000`. Microphone access requires a secure context (`localhost` or HTTPS).
 
-## 3. Try it
+---
 
-1. Tap the mic button, allow microphone access when prompted.
-2. Say: *"Spent 450 on dinner with friends"*.
-3. Recognized text appears, then the parsed card shows:
-   - Amount: 450
-   - Category: Food
-   - Description: Dinner
-   - Date: today
-   - People: friends
-4. Edit any field if the parser got something wrong, then **Save expense**.
+## Environment Variables
 
-## How the transcription works (`backend/whisper_service.py`)
+**Frontend** — `.env.local`
 
-- Uses `faster-whisper`, a fast CTranslate2 reimplementation of
-  OpenAI's open-source Whisper model.
-- Loaded **lazily** — the model only loads into memory on the first
-  `/transcribe-expense` call, so the API starts instantly.
-- Runs on CPU with `compute_type="int8"` to keep memory/CPU usage low.
-  Default model size is `base` (good speed/accuracy balance for short
-  sentences). Change `MODEL_SIZE` in `whisper_service.py`:
-  - `tiny` — fastest, lowest accuracy, good for low-end hardware
-  - `small` / `medium` — slower, more accurate, needs more RAM
-- If you have an NVIDIA GPU, change `device="cpu"` to `device="cuda"`
-  in `whisper_service.py` for much faster transcription.
+| Variable | Description | Example |
+|---|---|---|
+| `NEXT_PUBLIC_API_URL` | Base URL of the backend API | `http://localhost:8000` (dev) / `https://your-space.hf.space` (prod) |
 
-## How the parsing works (`backend/parser.py`)
+**Backend** — environment / Space secrets
 
-- **Amount**: regex looks for a number near ₹ / rs / rupees, or the
-  first standalone number in the sentence.
-- **Category**: keyword dictionary (`dinner`, `lunch` → Food; `uber`,
-  `cab` → Transport; etc.) — extend `CATEGORY_KEYWORDS` freely.
-- **Date**: `dateparser` library understands "yesterday", "last
-  Monday", "on 5th September", defaulting to today.
-- **People**: regex looks for `"with <name(s)>"` or `"for <name(s)>"`.
+| Variable | Description | Example |
+|---|---|---|
+| `ALLOWED_ORIGIN` | Frontend origin permitted via CORS | `https://your-app.vercel.app` |
+| `WHISPER_MODEL_SIZE` | faster-whisper model size (controls speed/accuracy/RAM tradeoff) | `base` |
 
-This rule-based approach is intentionally simple and free. It won't
-be perfect on tricky sentences — that's why the UI always shows an
-editable confirmation card before saving.
+---
 
-## Going further (still free)
+## Usage
 
-- **Receipt/photo understanding**: add a `/parse-receipt` endpoint
-  using `pytesseract` (free, local OCR) to read amounts off a photo.
-- **Smarter parsing**: swap `parser.py`'s logic for a call to a
-  free-tier LLM (Google Gemini free tier or Groq free tier both have
-  generous no-cost quotas) — pass the transcript and ask for JSON
-  back. Keep the current regex parser as a fallback if the API is
-  down or the quota is hit.
-- **Deploy for free**: frontend → Vercel (free tier, first-class
-  Next.js support). Backend → Render or Fly.io free tier (note: free
-  tiers usually spin down on idle and lose the SQLite file on
-  redeploy — for anything beyond a demo, move to a free Postgres
-  tier like Supabase or Neon).
-- **Multi-currency / voice in Hindi etc.**: `recognition.lang` in
-  `useSpeechRecognition.ts` can be changed to `"hi-IN"` etc.
+1. Tap the microphone button and grant microphone permission when prompted.
+2. Speak a sentence, e.g. *"Spent 450 on dinner with friends."*
+3. The transcribed text appears, followed by a parsed summary card:
+   - **Amount:** 450
+   - **Category:** Food
+   - **Description:** Dinner
+   - **Date:** Today
+   - **People:** Friends
+4. Review and correct any field if needed, then select **Save expense**.
 
-## Known limitations
+---
 
-- Web Speech API requires an internet connection (Chrome sends audio
-  to Google's speech service in the background) and only works
-  reliably in Chromium-based browsers.
-- The rule-based parser is deterministic, not AI — unusual phrasing
-  may need manual correction in the confirm card.
-- SQLite is fine for personal/demo use; for multi-user production
-  use, move to Postgres.
+## Speech-to-Text Pipeline
+
+Implemented in `backend/whisper_service.py`.
+
+- Uses `faster-whisper`, a CTranslate2-based reimplementation of OpenAI's open-source Whisper model.
+- The model is loaded lazily on the first `/transcribe-expense` request, so API startup remains fast.
+- Runs on CPU with `compute_type="int8"` to minimize memory and compute overhead.
+- Model size is configurable via `MODEL_SIZE`:
+  - `tiny` — fastest, lower accuracy; suitable for constrained hardware
+  - `base` — default; balances speed and accuracy for short sentences
+  - `small` / `medium` — higher accuracy, higher resource requirements
+- GPU acceleration is supported by setting `device="cuda"` where an NVIDIA GPU is available.
+
+---
+
+## Expense Parsing Logic
+
+Implemented in `backend/parser.py`. This is a deterministic, rule-based extractor — not a machine learning model — chosen to keep the pipeline free of external API dependencies.
+
+- **Amount:** Regex matching a number adjacent to a currency indicator (₹, Rs, rupees), falling back to the first standalone number in the sentence.
+- **Category:** Keyword-to-category mapping (e.g. `dinner`, `lunch` → Food; `uber`, `cab` → Transport), defined in `CATEGORY_KEYWORDS` and extensible.
+- **Date:** Parsed via the `dateparser` library, supporting relative expressions ("yesterday", "last Monday") and defaulting to the current date.
+- **People:** Regex matching `"with <name(s)>"` or `"for <name(s)>"` patterns.
+
+Because this approach is heuristic rather than model-based, the UI always presents an editable confirmation step before any record is saved.
+
+---
+
+## Deployment
+
+| Component | Recommended platform | Notes |
+|---|---|---|
+| Frontend | [Vercel](https://vercel.com) | Free tier; native Next.js support; deploys on push to `main` |
+| Backend | [Hugging Face Spaces](https://huggingface.co/spaces) (Docker SDK) | Free CPU tier sized for ML inference workloads such as Whisper |
+
+Deployment notes:
+- Set `NEXT_PUBLIC_API_URL` in the Vercel project settings to the deployed backend URL.
+- Configure CORS on the backend to allow the deployed frontend origin (`ALLOWED_ORIGIN`).
+- Use the `tiny` or `base` Whisper model size in resource-constrained free-tier environments.
+- Free-tier compute may sleep after a period of inactivity; the first request following a cold start will incur additional latency while the model loads into memory.
+
+---
+
+## Roadmap
+
+- **Receipt/photo parsing:** Add a `/parse-receipt` endpoint using local OCR (`pytesseract`) to extract amounts from receipt images.
+- **LLM-assisted parsing:** Optionally route transcripts through a free-tier LLM (e.g. Google Gemini or Groq) for improved extraction accuracy, retaining the current rule-based parser as a fallback.
+- **Multi-language support:** Pass a `language` parameter to the `faster-whisper` `.transcribe()` call to support non-English input.
+
+---
+
+## Known Limitations
+
+- The rule-based parser is deterministic and may misinterpret unconventional phrasing; the confirmation step mitigates this.
+- Free-tier hosting platforms may introduce cold-start latency after idle periods.
+- Data persistence behavior should be confirmed against the current backend implementation before production use.
+
+---
+
+## License
+
+MIT
