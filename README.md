@@ -16,14 +16,10 @@ Designed and built to operate at **zero infrastructure cost**, using entirely op
   - [Prerequisites](#prerequisites)
   - [Backend Setup](#backend-setup)
   - [Frontend Setup](#frontend-setup)
-- [Environment Variables](#environment-variables)
 - [Usage](#usage)
 - [Speech-to-Text Pipeline](#speech-to-text-pipeline)
 - [Expense Parsing Logic](#expense-parsing-logic)
-- [Deployment](#deployment)
-- [Roadmap](#roadmap)
 - [Known Limitations](#known-limitations)
-- [License](#license)
 
 ---
 
@@ -134,25 +130,6 @@ npm run dev
 
 Open `http://localhost:3000`. Microphone access requires a secure context (`localhost` or HTTPS).
 
----
-
-## Environment Variables
-
-**Frontend** — `.env.local`
-
-| Variable | Description | Example |
-|---|---|---|
-| `NEXT_PUBLIC_API_URL` | Base URL of the backend API | `http://localhost:8000` (dev) / `https://your-space.hf.space` (prod) |
-
-**Backend** — environment / Space secrets
-
-| Variable | Description | Example |
-|---|---|---|
-| `ALLOWED_ORIGIN` | Frontend origin permitted via CORS | `https://your-app.vercel.app` |
-| `WHISPER_MODEL_SIZE` | faster-whisper model size (controls speed/accuracy/RAM tradeoff) | `base` |
-
----
-
 ## Usage
 
 1. Tap the microphone button and grant microphone permission when prompted.
@@ -193,30 +170,6 @@ Implemented in `backend/parser.py`. This is a deterministic, rule-based extracto
 
 Because this approach is heuristic rather than model-based, the UI always presents an editable confirmation step before any record is saved.
 
----
-
-## Deployment
-
-| Component | Recommended platform | Notes |
-|---|---|---|
-| Frontend | [Vercel](https://vercel.com) | Free tier; native Next.js support; deploys on push to `main` |
-| Backend | [Hugging Face Spaces](https://huggingface.co/spaces) (Docker SDK) | Free CPU tier sized for ML inference workloads such as Whisper |
-
-Deployment notes:
-- Set `NEXT_PUBLIC_API_URL` in the Vercel project settings to the deployed backend URL.
-- Configure CORS on the backend to allow the deployed frontend origin (`ALLOWED_ORIGIN`).
-- Use the `tiny` or `base` Whisper model size in resource-constrained free-tier environments.
-- Free-tier compute may sleep after a period of inactivity; the first request following a cold start will incur additional latency while the model loads into memory.
-
----
-
-## Roadmap
-
-- **Receipt/photo parsing:** Add a `/parse-receipt` endpoint using local OCR (`pytesseract`) to extract amounts from receipt images.
-- **LLM-assisted parsing:** Optionally route transcripts through a free-tier LLM (e.g. Google Gemini or Groq) for improved extraction accuracy, retaining the current rule-based parser as a fallback.
-- **Multi-language support:** Pass a `language` parameter to the `faster-whisper` `.transcribe()` call to support non-English input.
-
----
 
 ## Known Limitations
 
@@ -225,7 +178,3 @@ Deployment notes:
 - Data persistence behavior should be confirmed against the current backend implementation before production use.
 
 ---
-
-## License
-
-MIT
