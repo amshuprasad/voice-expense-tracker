@@ -7,6 +7,7 @@ export interface ParsedExpense {
   description: string;
   date: string;
   people: string | null;
+  flagged?: boolean;
 }
 
 export interface Expense extends ParsedExpense {
@@ -14,9 +15,6 @@ export interface Expense extends ParsedExpense {
   created_at?: string;
 }
 
-// Uploads a recorded audio clip to the backend, which transcribes it
-// locally with the free, self-hosted faster-whisper model (no paid
-// speech API involved) and parses it in one round trip.
 export async function transcribeExpenseAudio(
   audioBlob: Blob
 ): Promise<ParsedExpense> {

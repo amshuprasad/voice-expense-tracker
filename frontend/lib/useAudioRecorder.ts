@@ -61,7 +61,6 @@ export function useAudioRecorder() {
   }, []);
 
   const startVisualizer = useCallback((stream: MediaStream) => {
-    // Web Audio API - built into every modern browser, no library needed.
     const AudioCtx =
       window.AudioContext || (window as any).webkitAudioContext;
     const audioContext = new AudioCtx();
@@ -81,13 +80,9 @@ export function useAudioRecorder() {
     const tick = () => {
       analyser.getByteFrequencyData(freqData);
 
-      // Overall level: average energy across the whole spectrum, 0-1.
       let sum = 0;
       for (let i = 0; i < freqData.length; i++) sum += freqData[i];
       setAudioLevel(sum / freqData.length / 255);
-
-      // Per-bar levels: average each contiguous chunk of bins so the
-      // bars move together with what's actually being picked up.
       const bars: number[] = [];
       for (let b = 0; b < VISUALIZER_BARS; b++) {
         let barSum = 0;
@@ -99,7 +94,6 @@ export function useAudioRecorder() {
         bars.push(barSum / binsPerBar / 255);
       }
       setFrequencyBars(bars);
-
       rafRef.current = requestAnimationFrame(tick);
     };
 
@@ -146,11 +140,8 @@ export function useAudioRecorder() {
     });
   }, [stopVisualizer]);
 
-  // Safety net: tear down the audio graph if the component unmounts
-  // mid-recording.
   useEffect(() => {
     return () => stopVisualizer();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return {

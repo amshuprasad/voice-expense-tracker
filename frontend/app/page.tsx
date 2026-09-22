@@ -110,10 +110,6 @@ export default function Home() {
   const glowSpread = isRecording ? 20 + audioLevel * 60 : 0;
   const glowOpacity = isRecording ? 0.25 + audioLevel * 0.5 : 0;
 
-  // ============================================================
-  // MICROPHONE
-  // ============================================================
-
   async function handleMicClick() {
     if (isRecording) {
       const blob = await stopRecording();
@@ -133,10 +129,6 @@ export default function Home() {
 
     await startRecording();
   }
-
-  // ============================================================
-  // TRANSCRIBE + AI UNDERSTANDING
-  // ============================================================
 
   async function handleTranscribe(blob: Blob) {
     setLoading(true);
@@ -168,10 +160,6 @@ export default function Home() {
     }
   }
 
-  // ============================================================
-  // SAVE
-  // ============================================================
-
   async function handleSave() {
     if (!parsed || parsed.amount === null) {
       setApiError("Please enter a valid amount.");
@@ -195,10 +183,6 @@ export default function Home() {
     }
   }
 
-  // ============================================================
-  // DELETE
-  // ============================================================
-
   async function handleDelete(id: number) {
     try {
       setDeletingId(id);
@@ -211,10 +195,6 @@ export default function Home() {
     }
   }
 
-  // ============================================================
-  // PROCESSING LABEL
-  // ============================================================
-
   const processingLabel = {
     idle: "Tap to speak",
     recording: "Listening...",
@@ -223,9 +203,6 @@ export default function Home() {
     ready: "Expense understood",
   }[processingStep];
 
-  // ============================================================
-  // RENDER
-  // ============================================================
 
   return (
     <main className="app-shell">
@@ -373,6 +350,12 @@ export default function Home() {
               Locally analyzed
             </div>
           </div>
+          {parsed.flagged && (
+            <div className="alert warning">
+              <span>⚠</span>
+              Some words in your recording were filtered. Please review the description below.
+            </div>
+          )}
 
           <div className="result-grid">
             <div className="result-field amount-field">
