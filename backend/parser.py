@@ -4,16 +4,17 @@ from datetime import datetime, timedelta
 import re
 import json
 import logging
+import os
+from dotenv import load_dotenv
 
 logger = logging.getLogger(__name__)
 
+load_dotenv()
 
 # OLLAMA CONFIG
-OLLAMA_URL = "http://localhost:11434/api/generate"
-
-OLLAMA_MODEL = "qwen3:4b"
-
-OLLAMA_TIMEOUT = 120
+OLLAMA_URL = os.getenv("OLLAMA_URL", "http://localhost:11434/api/generate")
+OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "qwen3:4b")
+OLLAMA_TIMEOUT = int(os.getenv("OLLAMA_TIMEOUT", "120"))
 
 CURRENCY_ALIASES = r"(?:₹|rs\.?|inr|rupees?|bucks?)"
 

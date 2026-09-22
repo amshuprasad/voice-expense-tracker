@@ -5,3 +5,4 @@ dateparser==1.2.0
 python-multipart==0.0.9
 faster-whisper==1.0.3
 better-profanity==0.7.0
+python-dotenv

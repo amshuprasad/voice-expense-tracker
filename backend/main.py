@@ -1,5 +1,5 @@
 import database as db
-from whisper_service import transcribe_audio, clean_transcript
+from whisper_service import transcribe_audio
 from parser import parse_expense_text
 from pydantic import BaseModel
 from fastapi.middleware.cors import CORSMiddleware
@@ -120,9 +120,9 @@ async def transcribe_expense(
             audio.filename,
         )
 
-        raw_text, flagged = transcribe_audio(tmp_path)
+        cleaned_text, flagged = transcribe_audio(tmp_path)
 
-        if not raw_text.strip():
+        if not cleaned_text.strip():
             raise HTTPException(
                 status_code=422,
                 detail=(
@@ -131,22 +131,25 @@ async def transcribe_expense(
                 ),
             )
 
-        cleaned_text, flagged = transcribe_audio(tmp_path)
-
-        if not cleaned_text.strip():
-            raise HTTPException(
-                status_code=422, detail="Couldn't hear anything. Please try speaking again.")
         if flagged:
-            logger.warning("Profanity detected in transcript, censored")
+            logger.warning(
+                "Profanity detected in transcript, censored"
+            )
 
-        logger.info("Transcript: %s", cleaned_text)
+        logger.info(
+            "Transcript: %s",
+            cleaned_text,
+        )
 
         parsed = parse_expense_text(cleaned_text)
 
         if parsed["amount"] is None:
             raise HTTPException(
                 status_code=422,
-                detail=f'Heard: "{cleaned_text}" but couldn\'t detect an amount.',
+                detail=(
+                    f'Heard: "{cleaned_text}" '
+                    "but couldn't detect an amount."
+                ),
             )
 
         parsed["flagged"] = flagged

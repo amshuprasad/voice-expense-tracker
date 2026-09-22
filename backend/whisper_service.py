@@ -1,13 +1,17 @@
 from faster_whisper import WhisperModel
 from better_profanity import profanity
 import logging
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
 
 logger = logging.getLogger(__name__)
 
 profanity.load_censor_words()
 
 _model = None
-MODEL_SIZE = "base"
+MODEL_SIZE = os.getenv("WHISPER_MODEL_SIZE", "base")
 
 def get_model() -> WhisperModel:
     global _model
