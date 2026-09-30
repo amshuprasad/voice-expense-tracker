@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useAudioRecorder } from "@/lib/useAudioRecorder";
-
+import VoiceBloom from "../app/components/VoiceBloom"
 import {
   transcribeExpenseAudio,
   saveExpense,
@@ -230,16 +230,12 @@ export default function Home() {
       </header>
       <section className="hero">
         <div className="hero-copy">
-          <h1>
-            <span className="hero-line hero-line-one">
-              Track spending
-            </span>
-
-            <span className="hero-line hero-line-two">
-              <span>without typing.</span>
-            </span>
-          </h1>
-
+          <VoiceBloom
+            text={"Track spending\nwithout typing."}
+            level={isRecording ? audioLevel : 0}
+            accent="#ff5c75"
+            height={260}
+          />
           <p className="hero-description">
             Simply speak your expense. Voice Spend intelligently captures, understands, and categorizes every transaction automatically.
           </p>
