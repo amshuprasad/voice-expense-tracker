@@ -282,9 +282,7 @@ export default function Home() {
             </button>
           </div>
 
-          <div className="voice-status">
-            {processingLabel}
-          </div>
+          <div className="voice-status" key={processingStep}>{processingLabel}</div>
 
           {isRecording && (
             <div className="sound-wave">

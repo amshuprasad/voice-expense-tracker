@@ -44,7 +44,12 @@ button {
   padding-bottom: 70px;
 }
 
-
+.app-shell {
+  min-height: 100vh;
+  background:
+    radial-gradient(ellipse 80% 50% at 50% 0%, rgba(255, 92, 117, 0.16), transparent 70%),
+    #0a0910;
+}
 /* ============================================================
    HEADER
    ============================================================ */
@@ -1010,4 +1015,8 @@ button {
   align-items: center;
   gap: 8px;
   margin-bottom: 16px;
+}
+
+.voice-status {
+  animation: rise 0.3s both;
 }

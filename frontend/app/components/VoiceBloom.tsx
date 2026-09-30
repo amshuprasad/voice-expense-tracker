@@ -396,7 +396,7 @@ export default function VoiceBloom({
             <canvas
                 ref={canvasRef}
                 aria-hidden="true"
-                style={{ position: "absolute", inset: 0, width: "100%", height: "100%" }}
+                style={{position: "absolute", inset: 0, width: "100%", height: "100%",filter: "drop-shadow(0 0 14px rgba(255,92,117,0.55))"}}
             />
         </div>
     );
