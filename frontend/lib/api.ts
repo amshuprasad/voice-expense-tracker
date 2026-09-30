@@ -10,14 +10,29 @@ export interface ParsedExpense {
   flagged?: boolean;
 }
 
+export type QueryResult = {
+  type: "query";
+  raw_text: string;
+  start: string | null;
+  end: string;
+  label: string;
+  message: string;
+  total: number;
+  count: number;
+  by_category: { category: string; total: number; count: number }[];
+};
+
 export interface Expense extends ParsedExpense {
   id: number;
   created_at?: string;
 }
 
+export type ExpenseResult = ParsedExpense & { type: "expense" };
+export type VoiceResult = ExpenseResult | QueryResult;
+
 export async function transcribeExpenseAudio(
   audioBlob: Blob
-): Promise<ParsedExpense> {
+): Promise<VoiceResult> {
   const formData = new FormData();
   formData.append("audio", audioBlob, "clip.webm");
 
@@ -32,7 +47,7 @@ export async function transcribeExpenseAudio(
   return res.json();
 }
 
-export async function parseExpenseText(text: string): Promise<ParsedExpense> {
+export async function parseExpenseText(text: string): Promise<VoiceResult> {
   const res = await fetch(`${API_BASE}/parse-expense`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },

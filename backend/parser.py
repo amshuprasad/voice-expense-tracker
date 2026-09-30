@@ -1,3 +1,4 @@
+from datetime import datetime, timedelta, date
 import requests
 import dateparser
 from datetime import datetime, timedelta
@@ -351,3 +352,95 @@ def parse_expense_text(text: str) -> dict:
         "date": date,
         "people": ai_result["people"],
     }
+
+
+QUERY_PATTERN = re.compile(
+    r"\b(how much"
+    r"|what (?:did|have) i (?:spend|spent)"
+    r"|what (?:is|was) my (?:total|spending)"
+    r"|total (?:spent|spending|expenses?)"
+    r"|show (?:me )?(?:my )?(?:expenses|spending))\b",
+    re.IGNORECASE,
+)
+
+ALL_TIME_PATTERN = re.compile(
+    r"\b(till|until) (today|now|date)\b|\bso far\b|\bin total\b"
+    r"|\btotally\b|\boverall\b|\baltogether\b",
+    re.IGNORECASE,
+)
+
+DATE_SETTINGS = {"PREFER_DATES_FROM": "past", "DATE_ORDER": "DMY"}
+
+
+def is_query(text: str) -> bool:
+    return bool(QUERY_PATTERN.search(text))
+
+
+def _parse_day(fragment: str):
+    fragment = re.sub(r"\b(on|the|of)\b", " ", fragment,
+                      flags=re.IGNORECASE).strip()
+    parsed = dateparser.parse(fragment, settings=DATE_SETTINGS)
+    return parsed.date() if parsed else None
+
+
+def extract_date_range(text: str):
+    """Returns (start_iso | None, end_iso). start=None means all time."""
+    today = date.today()
+    lower = text.lower()
+
+    # 1. Explicit range: "from X to Y" / "between X and Y"
+    m = re.search(
+        r"(?:from|between)\s+(.+?)\s+(?:to|till|until|and)\s+(.+?)(?:[?.!]|$)",
+        lower,
+    )
+    if m:
+        s, e = _parse_day(m.group(1)), _parse_day(m.group(2))
+        if s and e:
+            if s > e:
+                s, e = e, s
+            return s.isoformat(), e.isoformat()
+
+    # 2. All time: "totally", "so far", "till today"
+    if ALL_TIME_PATTERN.search(lower):
+        return None, today.isoformat()
+
+    # 3. Relative periods
+    if "yesterday" in lower:
+        d = (today - timedelta(days=1)).isoformat()
+        return d, d
+    if "today" in lower:
+        return today.isoformat(), today.isoformat()
+    if "last week" in lower:
+        start = today - timedelta(days=today.weekday() + 7)
+        return start.isoformat(), (start + timedelta(days=6)).isoformat()
+    if "this week" in lower:
+        return (today - timedelta(days=today.weekday())).isoformat(), today.isoformat()
+    if "last month" in lower:
+        end = today.replace(day=1) - timedelta(days=1)
+        return end.replace(day=1).isoformat(), end.isoformat()
+    if "this month" in lower:
+        return today.replace(day=1).isoformat(), today.isoformat()
+    if "this year" in lower:
+        return today.replace(month=1, day=1).isoformat(), today.isoformat()
+    m = re.search(r"last (\d+) days?", lower)
+    if m:
+        n = int(m.group(1))
+        return (today - timedelta(days=n - 1)).isoformat(), today.isoformat()
+
+    # 4. Single date: "on 5th September", "on 12/09/2026"
+    m = re.search(r"\bon\s+(.+?)(?:[?.!]|$)", lower)
+    if m:
+        d = _parse_day(m.group(1))
+        if d:
+            return d.isoformat(), d.isoformat()
+
+    # 5. Default: all time
+    return None, today.isoformat()
+
+
+def describe_range(start, end) -> str:
+    if start is None:
+        return f"in total (till {end})"
+    if start == end:
+        return f"on {start}"
+    return f"from {start} to {end}"

@@ -67,3 +67,32 @@ def summary_by_category():
             "FROM expenses GROUP BY category ORDER BY total DESC"
         ).fetchall()
         return [dict(row) for row in rows]
+
+
+def total_between(start: str | None = None, end: str | None = None):
+    clauses, params = [], []
+    if start:
+        clauses.append("date >= ?")
+        params.append(start)
+    if end:
+        clauses.append("date <= ?")
+        params.append(end)
+    where = f"WHERE {' AND '.join(clauses)}" if clauses else ""
+
+    with get_conn() as conn:
+        row = conn.execute(
+            f"SELECT COALESCE(SUM(amount), 0) AS total, COUNT(*) AS count "
+            f"FROM expenses {where}",
+            params,
+        ).fetchone()
+        cats = conn.execute(
+            f"SELECT category, SUM(amount) AS total, COUNT(*) AS count "
+            f"FROM expenses {where} GROUP BY category ORDER BY total DESC",
+            params,
+        ).fetchall()
+
+    return {
+        "total": round(row["total"], 2),
+        "count": row["count"],
+        "by_category": [dict(c) for c in cats],
+    }

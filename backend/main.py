@@ -9,6 +9,7 @@ import tempfile
 import shutil
 import os
 import logging
+from parser import parse_expense_text, is_query, extract_date_range, describe_range
 
 logging.basicConfig(
     level=logging.INFO,
@@ -51,40 +52,24 @@ def root():
         "speech": "local-faster-whisper",
     }
 
+
 @app.post("/parse-expense")
 def parse_expense(payload: TextInput):
-
     if not payload.text or not payload.text.strip():
-        raise HTTPException(
-            status_code=400,
-            detail="Empty text",
-        )
+        raise HTTPException(status_code=400, detail="Empty text")
 
     try:
-        parsed = parse_expense_text(
-            payload.text
-        )
-
+        parsed = process_text(payload.text.strip())
     except Exception as exc:
-        logger.exception(
-            "Expense parsing failed"
-        )
-
+        logger.exception("Expense parsing failed")
         raise HTTPException(
-            status_code=500,
-            detail=f"Expense parsing failed: {exc}",
-        )
+            status_code=500, detail=f"Expense parsing failed: {exc}")
 
-    if parsed["amount"] is None:
+    if parsed["type"] == "expense" and parsed["amount"] is None:
         raise HTTPException(
             status_code=422,
-            detail=(
-                "Could not detect an amount. "
-                "Try saying something like "
-                "'Spent 450 on dinner'."
-            ),
+            detail="Could not detect an amount. Try saying something like 'Spent 450 on dinner'.",
         )
-
     return parsed
 
 
@@ -141,19 +126,15 @@ async def transcribe_expense(
             cleaned_text,
         )
 
-        parsed = parse_expense_text(cleaned_text)
+        parsed = process_text(cleaned_text)
 
-        if parsed["amount"] is None:
+        if parsed["type"] == "expense" and parsed["amount"] is None:
             raise HTTPException(
                 status_code=422,
-                detail=(
-                    f'Heard: "{cleaned_text}" '
-                    "but couldn't detect an amount."
-                ),
-            )
+                detail=f'Heard: "{cleaned_text}" but couldn\'t detect an amount.',
+        )
 
         parsed["flagged"] = flagged
-
         return parsed
 
     except HTTPException:
@@ -210,3 +191,21 @@ def get_summary():
     return db.summary_by_category()
 
 
+def process_text(text: str) -> dict:
+    if is_query(text):
+        start, end = extract_date_range(text)
+        result = db.total_between(start, end)
+        label = describe_range(start, end)
+        return {
+            "type": "query",
+            "raw_text": text,
+            "start": start,
+            "end": end,
+            "label": label,
+            "message": f"You spent ₹{result['total']:,.2f} {label}",
+            **result,
+        }
+
+    parsed = parse_expense_text(text)
+    parsed["type"] = "expense"
+    return parsed

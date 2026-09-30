@@ -10,6 +10,7 @@ import {
   deleteExpense,
   ParsedExpense,
   Expense,
+  QueryResult
 } from "@/lib/api";
 
 type ProcessingStep =
@@ -32,7 +33,7 @@ export default function Home() {
 
   const [parsed, setParsed] = useState<ParsedExpense | null>(null);
   const [expenses, setExpenses] = useState<Expense[]>([]);
-
+  const [queryResult, setQueryResult] = useState<QueryResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [apiError, setApiError] = useState<string | null>(null);
   const [heardText, setHeardText] = useState("");
@@ -56,7 +57,8 @@ export default function Home() {
   }, []);
 
 
-  const today = new Date().toISOString().split("T")[0];
+  // const today = new Date().toISOString().split("T")[0];
+  const today = new Date().toLocaleDateString("en-CA"); // YYYY-MM-DD, local time
 
   const todayExpenses = useMemo(() => {
     return expenses.filter((expense) => expense.date === today);
@@ -122,6 +124,7 @@ export default function Home() {
     }
 
     setParsed(null);
+    setQueryResult(null);
     setHeardText("");
     setApiError(null);
 
@@ -131,34 +134,40 @@ export default function Home() {
   }
 
   async function handleTranscribe(blob: Blob) {
-    setLoading(true);
-    setApiError(null);
+  setLoading(true);
+  setApiError(null);
 
-    try {
-      setProcessingStep("transcribing");
+  try {
+    setProcessingStep("transcribing");
 
-      // Small delay gives the UI a natural pipeline feel.
-      await new Promise((resolve) => setTimeout(resolve, 350));
+    // Small delay gives the UI a natural pipeline feel.
+    await new Promise((resolve) => setTimeout(resolve, 350));
 
-      setProcessingStep("understanding");
+    setProcessingStep("understanding");
 
-      const result = await transcribeExpenseAudio(blob);
+    const result = await transcribeExpenseAudio(blob);
 
-      setHeardText(result.raw_text);
+    setHeardText(result.raw_text);
 
+    if (result.type === "query") {
+      setQueryResult(result);
+      setParsed(null);
+    } else {
       setParsed(result);
-
-      setProcessingStep("ready");
-    } catch (e: any) {
-      setApiError(
-        e?.message || "Unable to understand the expense."
-      );
-
-      setProcessingStep("idle");
-    } finally {
-      setLoading(false);
+      setQueryResult(null);
     }
+
+    setProcessingStep("ready");
+  } catch (e: any) {
+    setApiError(
+      e?.message || "Unable to understand the expense."
+    );
+
+    setProcessingStep("idle");
+  } finally {
+    setLoading(false);
   }
+}
 
   async function handleSave() {
     if (!parsed || parsed.amount === null) {
@@ -200,7 +209,7 @@ export default function Home() {
     recording: "Listening...",
     transcribing: "Transcribing your voice...",
     understanding: "AI is understanding your expense...",
-    ready: "Expense understood",
+    ready: queryResult ? "Here's your answer" : "Expense understood",
   }[processingStep];
 
 
@@ -345,10 +354,6 @@ export default function Home() {
                 Expense detected
               </h2>
             </div>
-            <div className="confidence">
-              <span>●</span>
-              Locally analyzed
-            </div>
           </div>
           {parsed.flagged && (
             <div className="alert warning">
@@ -458,6 +463,52 @@ export default function Home() {
           </div>
         </section>
       )}
+
+      {queryResult && (
+        <section className="result-card">
+          <div className="result-header">
+            <div>
+              <div className="section-label">AI ANSWER</div>
+              <h2>₹{queryResult.total.toLocaleString("en-IN")}</h2>
+            </div>
+          </div>
+
+          <p className="hero-description">
+            {queryResult.count} {queryResult.count === 1 ? "expense" : "expenses"}{" "}
+            {queryResult.label}
+          </p>
+
+          {queryResult.by_category.length > 0 && (
+            <div className="category-list">
+              {queryResult.by_category.map((c) => (
+                <div className="category-row" key={c.category}>
+                  <div className="category-name">
+                    <span className="category-dot" />
+                    {c.category}
+                  </div>
+                  <div className="category-amount">
+                    ₹{Number(c.total).toLocaleString("en-IN")}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <div className="result-actions">
+            <button
+              className="discard-button"
+              onClick={() => {
+                setQueryResult(null);
+                setHeardText("");
+                setProcessingStep("idle");
+              }}
+            >
+              Dismiss
+            </button>
+          </div>
+        </section>
+      )}
+
       <section className="stats-grid">
         <div className="stat-card">
           <div className="stat-icon">₹</div>
